@@ -42,6 +42,8 @@ void tarjan(Node*, map<int, int>, map<int, int>, stack<int>,
             vector<vector<int>>, map<int, bool>);
 void combine_scc_node(vector<vector<int>>);
 bool query(int outNodeNum, int inNodeNum);
+void search_out_node(Node*);
+void search_in_node(Node*);
 
 inline void insert_edge(Node* node, Edge* edge)
 {
@@ -102,6 +104,19 @@ int main(int argc, char *argv[])
     combine_scc_node(scc);
 
     cout << "Building 2-hops-label's data structure..." << endl;
+    for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
+        search_out_node((*beg).second);
+    }
+
+    for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
+        search_in_node((*beg).second);
+    }
+
+    cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
+    while (cin >> outNodeNum >> inNodeNum) {
+        cout << query(outNodeNum,inNodeNum) << endl;
+        cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
+    }
 
     return 0;
 }
@@ -176,24 +191,57 @@ void combine_scc_node(vector<vector<int>> scc)
 void search_out_node(Node *node)
 {
     queue<int> q;
-    if (node->firOut == nullptr)
-        return;
+    map<int, bool> accessed;
+    Node *cur_node = node;
 
-    for (Edge *edge = node->firOut; edge != nullptr; edge = edge->headLink) {
+    for (Edge *edge = cur_node->firOut; edge != nullptr; edge = edge->headLink)
         q.push(edge->tailVex);
-        node->outNodes.push_back(edge->tailVex);
-    }
 
     while (!q.empty()) {
-        Node *n = graph.nodes[q.front()];
+        cur_node = graph.nodes[q.front()];
+        q.pop();
 
+        if (cur_node->visited != 1 && !query(node->data, cur_node->data)) {
+            for (Edge *edge = cur_node->firOut; edge != nullptr; edge = edge->headLink) {
+                if (!accessed[edge->tailVex]) {
+                    q.push(edge->tailVex);
+                }
+            }
+        }
+
+        node->outNodes.push_back(cur_node->data);
+        accessed[cur_node->data] = true;
     }
 
+    node->visited = 1;
 }
 
 void search_in_node(Node *node)
 {
-    Edge *edge = node->firIn;
+    queue<int> q;
+    map<int, bool> accessed;
+    Node *cur_node = node;
+
+    for (Edge *edge = cur_node->firIn; edge != nullptr; edge = edge->tailLink)
+        q.push(edge->headVex);
+
+    while (!q.empty()) {
+        cur_node = graph.nodes[q.front()];
+        q.pop();
+
+        if (cur_node->visited != 2 && !query(node->data, cur_node->data)) {
+            for (Edge *edge = cur_node->firIn; edge != nullptr; edge = edge->tailLink) {
+                if (!accessed[edge->headVex]) {
+                    q.push(edge->headVex);
+                }
+            }
+        }
+
+        node->inNodes.push_back(cur_node->data);
+        accessed[cur_node->data] = true;
+    }
+
+    node->visited = 2;
 }
 
 bool query(int outNodeNum, int inNodeNum)
