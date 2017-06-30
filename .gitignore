@@ -40,4 +40,4 @@
 .idea/libraries
 
 # Input data
-data
+*.txt
