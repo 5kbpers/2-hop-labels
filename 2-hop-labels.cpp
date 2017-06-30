@@ -5,6 +5,7 @@
 #include <map>
 #include <queue>
 #include <algorithm>
+#include <set>
 
 using namespace std;
 
@@ -20,14 +21,16 @@ struct Edge {
 };
 
 struct Node {
-    char visited;
+    bool tarjan;
+    bool bfs;
+    bool reverse_bfs;
     int data;
-    vector<int> inNodes, outNodes;
+    set<int> inNodes, outNodes;
     Edge *firIn, *firOut;
 
     Node(int data) {
         this->data = data;
-        this->visited = 0;
+        this->tarjan = this->bfs = this->reverse_bfs = false;
         this->firIn = this->firOut = nullptr;
     }
 };
@@ -38,25 +41,41 @@ struct Graph {
 } graph;
 
 
-void tarjan(Node*, map<int, int>, map<int, int>, stack<int>,
-            vector<vector<int>>, map<int, bool>);
-void combine_scc_node(vector<vector<int>>);
+void tarjan(Node*, map<int, int>&, map<int, int>&, stack<int>&,
+            vector<vector<int>>&, map<int, bool>&);
+void combine_scc_node(vector<vector<int>>&);
 bool query(int outNodeNum, int inNodeNum);
 void search_out_node(Node*);
 void search_in_node(Node*);
 
 inline void insert_edge(Node* node, Edge* edge)
 {
-    Edge *last_edge;
-    for (last_edge = node->firOut; last_edge->headLink != nullptr; last_edge = last_edge->headLink){}
+    Edge *last_edge = node->firOut;
+    if (last_edge == nullptr) {
+        node->firOut = edge;
+        return;
+    }
+
+    while (last_edge != nullptr && last_edge->headLink != nullptr) {
+        last_edge = last_edge->headLink;
+    }
+
     last_edge->headLink = edge;
 }
 
 inline void insert_reverse_edge(Node* node, Edge* edge)
 {
 
-    Edge *last_edge;
-    for (last_edge = node->firIn; last_edge->tailLink != nullptr; last_edge = last_edge->tailLink){}
+    Edge *last_edge = node->firIn;
+    if (last_edge == nullptr) {
+        node->firIn = edge;
+        return;
+    }
+
+    while (last_edge->tailLink != nullptr) {
+        last_edge = last_edge->tailLink;
+    }
+
     last_edge->tailLink = edge;
 }
 
@@ -72,8 +91,8 @@ inline Node* init_inexistent_node(int nodeNum)
 
 int main(int argc, char *argv[])
 {
-    ifstream fin(argv[1]);
-    cout << "Loading data from " << argv[1] << "..." << endl;
+    ifstream fin("data");
+    cout << "Loading data from data file" << "..." << endl;
     fin >> graph.nodeNum >> graph.edgeNum;
 
     int inNodeNum, outNodeNum;
@@ -96,8 +115,8 @@ int main(int argc, char *argv[])
     vector<vector<int>> scc;
 
     for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
-        if (beg->second->visited >= 0) {
-            tarjan(inNode, def, low, st, scc, stack_sign);
+        if (!beg->second->tarjan) {
+            tarjan(beg->second, def, low, st, scc, stack_sign);
         }
     }
 
@@ -106,10 +125,21 @@ int main(int argc, char *argv[])
     cout << "Building 2-hops-label's data structure..." << endl;
     for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
         search_out_node((*beg).second);
+        search_in_node((*beg).second);
     }
 
     for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
-        search_in_node((*beg).second);
+        Node *n = beg->second;
+        cout << "Node " << n->data << ":" << endl;
+        cout << "out nodes: ";
+        for (auto r : n->outNodes)
+            cout << r << " ";
+        cout << endl;
+
+        cout << "in nodes: ";
+        for (auto r : n->inNodes)
+            cout << r << " ";
+        cout << endl;
     }
 
     cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
@@ -121,8 +151,8 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void tarjan(Node *node, map<int, int> def, map<int, int> low, stack<int> st,
-            vector<vector<int>> scc, map<int, bool> stack_sign)
+void tarjan(Node *node, map<int, int> &def, map<int, int> &low, stack<int> &st,
+            vector<vector<int>> &scc, map<int, bool> &stack_sign)
 {
     if (node == nullptr) {
         cout << "In tarjan function: the variable 'node' is nullptr" << endl;
@@ -133,12 +163,12 @@ void tarjan(Node *node, map<int, int> def, map<int, int> low, stack<int> st,
     def[node->data] = low[node->data] = ++index;
     st.push(node->data);
     stack_sign[node->data] = true;
-    node->visited = -1;
+    node->tarjan = true;
 
     Edge *edge = node->firOut;
     while (edge != nullptr) {
         Node *next_node = graph.nodes[edge->tailVex];
-        if (next_node->visited >= 0) {
+        if (!next_node->tarjan) {
             tarjan(next_node, def, low, st, scc, stack_sign);
             low[node->data] = min(low[node->data], low[next_node->data]);
         }
@@ -146,24 +176,25 @@ void tarjan(Node *node, map<int, int> def, map<int, int> low, stack<int> st,
             low[node->data] = min(low[node->data], def[next_node->data]);
         }
 
-        if (def[node->data] == low[node->data]) {
-            vector<int> new_scc;
-            while (1) {
-                int top_data = st.top();
-                stack_sign[top_data] = false;
-                new_scc.push_back(top_data);
-                st.pop();
-                if (top_data == node->data) {
-                    break;
-                }
-            }
-            scc.push_back(new_scc);
-        }
         edge = edge->headLink;
+    }
+
+    if (def[node->data] == low[node->data]) {
+        vector<int> new_scc;
+        while (1) {
+            int top_data = st.top();
+            stack_sign[top_data] = false;
+            new_scc.push_back(top_data);
+            st.pop();
+            if (top_data == node->data) {
+                break;
+            }
+        }
+        scc.push_back(new_scc);
     }
 }
 
-void combine_scc_node(vector<vector<int>> scc)
+void combine_scc_node(vector<vector<int>> &scc)
 {
     for (auto s : scc) {
         int first = *(s.begin());
@@ -201,7 +232,7 @@ void search_out_node(Node *node)
         cur_node = graph.nodes[q.front()];
         q.pop();
 
-        if (cur_node->visited != 1 && !query(node->data, cur_node->data)) {
+        if (!cur_node->bfs && !query(node->data, cur_node->data)) {
             for (Edge *edge = cur_node->firOut; edge != nullptr; edge = edge->headLink) {
                 if (!accessed[edge->tailVex]) {
                     q.push(edge->tailVex);
@@ -209,11 +240,11 @@ void search_out_node(Node *node)
             }
         }
 
-        node->outNodes.push_back(cur_node->data);
+        node->outNodes.insert(cur_node->data);
         accessed[cur_node->data] = true;
     }
 
-    node->visited = 1;
+    node->bfs = true;
 }
 
 void search_in_node(Node *node)
@@ -229,7 +260,7 @@ void search_in_node(Node *node)
         cur_node = graph.nodes[q.front()];
         q.pop();
 
-        if (cur_node->visited != 2 && !query(node->data, cur_node->data)) {
+        if (!cur_node->reverse_bfs && !query(node->data, cur_node->data)) {
             for (Edge *edge = cur_node->firIn; edge != nullptr; edge = edge->tailLink) {
                 if (!accessed[edge->headVex]) {
                     q.push(edge->headVex);
@@ -237,11 +268,11 @@ void search_in_node(Node *node)
             }
         }
 
-        node->inNodes.push_back(cur_node->data);
+        node->inNodes.insert(cur_node->data);
         accessed[cur_node->data] = true;
     }
 
-    node->visited = 2;
+    node->reverse_bfs = true;
 }
 
 bool query(int outNodeNum, int inNodeNum)
@@ -249,15 +280,30 @@ bool query(int outNodeNum, int inNodeNum)
     Node *outNode = graph.nodes[ graph.nodes[outNodeNum]->data ];
     Node *inNode = graph.nodes[ graph.nodes[inNodeNum]->data ];
 
-    vector<int> out_vec(outNode->outNodes);
-    out_vec.push_back(outNodeNum);
+    set<int> out_set(outNode->outNodes);
+    for (auto o : outNode->outNodes) {
+        Node *n = graph.nodes[o];
+        set_union(n->outNodes.begin(), n->outNodes.end(),
+                  out_set.begin(), out_set.end(),
+                  inserter(out_set, out_set.end()));
+    }
+    out_set.insert(outNodeNum);
 
-    vector<int> in_vec(inNode->inNodes);
-    in_vec.push_back(inNodeNum);
+    set<int> in_set(inNode->inNodes);
+    for (auto o : inNode->inNodes) {
+        Node *n = graph.nodes[o];
+        set_union(n->inNodes.begin(), n->inNodes.end(),
+                  in_set.begin(), in_set.end(),
+                  inserter(in_set, in_set.end()));
+    }
+    in_set.insert(inNodeNum);
 
-    vector<int> result;
+    set<int> result;
 
-    set_intersection(in_vec.begin(), in_vec.end(), out_vec.begin(), out_vec.end(), result);
+    set_intersection(in_set.begin(), in_set.end(),
+                     out_set.begin(), out_set.end(),
+                     inserter(result, result.begin()));
 
     return !result.empty();
 }
+
