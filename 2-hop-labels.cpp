@@ -1,98 +1,15 @@
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <stack>
-#include <map>
-#include <queue>
-#include <algorithm>
-#include <set>
-
-using namespace std;
-
-struct Edge {
-    int headVex, tailVex;
-    Edge *headLink, *tailLink;
-
-    Edge(int headVex, int tailVex) {
-        this->headVex = headVex;
-        this->tailVex = tailVex;
-        this->headLink = this->tailLink = nullptr;
-    }
-};
-
-struct Node {
-    bool tarjan;
-    bool bfs;
-    bool reverse_bfs;
-    int data;
-    set<int> inNodes, outNodes;
-    Edge *firIn, *firOut;
-
-    Node(int data) {
-        this->data = data;
-        this->tarjan = this->bfs = this->reverse_bfs = false;
-        this->firIn = this->firOut = nullptr;
-    }
-};
-
-struct Graph {
-    int nodeNum, edgeNum;
-    map<int, Node*> nodes;
-} graph;
-
-
-void tarjan(Node*, map<int, int>&, map<int, int>&, stack<int>&,
-            vector<vector<int>>&, map<int, bool>&);
-void combine_scc_node(vector<vector<int>>&);
-bool query(int outNodeNum, int inNodeNum);
-void search_out_node(Node*);
-void search_in_node(Node*);
-
-inline void insert_edge(Node* node, Edge* edge)
-{
-    Edge *last_edge = node->firOut;
-    if (last_edge == nullptr) {
-        node->firOut = edge;
-        return;
-    }
-
-    while (last_edge != nullptr && last_edge->headLink != nullptr) {
-        last_edge = last_edge->headLink;
-    }
-
-    last_edge->headLink = edge;
-}
-
-inline void insert_reverse_edge(Node* node, Edge* edge)
-{
-
-    Edge *last_edge = node->firIn;
-    if (last_edge == nullptr) {
-        node->firIn = edge;
-        return;
-    }
-
-    while (last_edge->tailLink != nullptr) {
-        last_edge = last_edge->tailLink;
-    }
-
-    last_edge->tailLink = edge;
-}
-
-inline Node* init_inexistent_node(int nodeNum)
-{
-    if (graph.nodes[nodeNum] == nullptr) {
-        graph.nodes[nodeNum] = new Node(nodeNum);
-    }
-
-    return graph.nodes[nodeNum];
-}
+#include "2-hop-labels.h"
 
 
 int main(int argc, char *argv[])
 {
-    ifstream fin("data");
-    cout << "Loading data from data file" << "..." << endl;
+    if (argv[1] == nullptr) {
+        cout << "Usage: ./a.out <filename>" << endl;
+        exit(1);
+    }
+
+    ifstream fin(argv[1]);
+    cout << "Loading data from file " << argv[1] << "..." << endl;
     fin >> graph.nodeNum >> graph.edgeNum;
 
     int inNodeNum, outNodeNum;
@@ -120,26 +37,20 @@ int main(int argc, char *argv[])
         }
     }
 
+    for (auto beg = scc.begin(); beg != scc.end(); ++beg) {
+        cout << "scc1 :";
+        for (int r : *beg) {
+            cout << r << " ";
+        }
+        cout << endl;
+    }
+
     combine_scc_node(scc);
 
     cout << "Building 2-hops-label's data structure..." << endl;
     for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
         search_out_node((*beg).second);
         search_in_node((*beg).second);
-    }
-
-    for (auto beg = graph.nodes.begin(); beg != graph.nodes.end(); ++beg) {
-        Node *n = beg->second;
-        cout << "Node " << n->data << ":" << endl;
-        cout << "out nodes: ";
-        for (auto r : n->outNodes)
-            cout << r << " ";
-        cout << endl;
-
-        cout << "in nodes: ";
-        for (auto r : n->inNodes)
-            cout << r << " ";
-        cout << endl;
     }
 
     cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
@@ -204,13 +115,17 @@ void combine_scc_node(vector<vector<int>> &scc)
             }
             int r = *beg;
             for (Edge *edge = graph.nodes[r]->firOut; edge != nullptr; edge = edge->headLink) {
-                edge->headVex = first;
-                insert_edge(graph.nodes[first], edge);
+                if (edge->tailVex != first) {
+                    edge->headVex = first;
+                    insert_edge(graph.nodes[first], edge);
+                }
             }
 
             for (Edge *edge = graph.nodes[r]->firIn; edge != nullptr; edge = edge->tailLink) {
-                edge->tailVex = first;
-                insert_reverse_edge(graph.nodes[first], edge);
+                if (edge->headVex != first) {
+                    edge->tailVex = first;
+                    insert_reverse_edge(graph.nodes[first], edge);
+                }
             }
             graph.nodes[r]->data = first;
             graph.nodes[r]->firIn = nullptr;
