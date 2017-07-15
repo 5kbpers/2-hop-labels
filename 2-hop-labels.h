@@ -29,7 +29,7 @@ struct Node {
     bool bfs;
     bool reverse_bfs;
     int data;
-    set<int> inNodes, outNodes;
+    vector<int> inNodes, outNodes;
     Edge *firIn, *firOut;
 
     Node(int data) {
