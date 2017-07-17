@@ -10,6 +10,9 @@
 #include <queue>
 #include <algorithm>
 #include <set>
+#include <string>
+
+#include <time.h>
 
 using namespace std;
 
@@ -41,6 +44,8 @@ struct Node {
 
 struct Graph {
     int nodeNum, edgeNum;
+    map<string, int> numberMap;
+    map<int, string> nameMap;
     map<int, Node*> nodes;
 } graph;
 
@@ -55,32 +60,16 @@ void search_in_node(Node*);
 inline void insert_edge(Node* node, Edge* edge)
 {
     Edge *last_edge = node->firOut;
-    if (last_edge == nullptr) {
-        node->firOut = edge;
-        return;
-    }
-
-    while (last_edge->headLink != nullptr) {
-        last_edge = last_edge->headLink;
-    }
-
-    last_edge->headLink = edge;
+    node->firOut = edge;
+    edge->headLink = last_edge;
 }
 
 inline void insert_reverse_edge(Node* node, Edge* edge)
 {
 
     Edge *last_edge = node->firIn;
-    if (last_edge == nullptr) {
-        node->firIn = edge;
-        return;
-    }
-
-    while (last_edge->tailLink != nullptr) {
-        last_edge = last_edge->tailLink;
-    }
-
-    last_edge->tailLink = edge;
+    node->firIn = edge;
+    edge->tailLink = last_edge;
 }
 
 inline Node* init_inexistent_node(int nodeNum)
@@ -93,3 +82,4 @@ inline Node* init_inexistent_node(int nodeNum)
 }
 
 #endif //N_2_HOP_LABELS_H
+

@@ -9,13 +9,38 @@ int main(int argc, char *argv[])
     }
 
     ifstream fin(argv[1]);
+    ofstream sccout("scc-out");
+    ofstream labelout("label-out");
+
     cout << "Loading data from file " << argv[1] << "..." << endl;
     fin >> graph.nodeNum >> graph.edgeNum;
 
+    int numberCount = 0;
+    string inNodeID, outNodeID;
     int inNodeNum, outNodeNum;
     Node *inNode = nullptr, *outNode = nullptr;
+
+    clock_t start = clock();
+
     for (int j = 0; j < graph.edgeNum; j++) {
-        fin >> outNodeNum >> inNodeNum;
+        fin >> outNodeID >> inNodeID;
+
+        if (graph.numberMap[outNodeID] == 0) {
+            outNodeNum = graph.numberMap[outNodeID] = ++numberCount;
+            graph.nameMap[outNodeNum] = outNodeID;
+        }
+        else {
+            outNodeNum = graph.numberMap[outNodeID];
+        }
+
+        if (graph.numberMap[inNodeID] == 0) {
+            inNodeNum = graph.numberMap[inNodeID] = ++numberCount;
+            graph.nameMap[inNodeNum] = inNodeID;
+        }
+        else {
+            inNodeNum = graph.numberMap[inNodeID];
+        }
+
         outNode = init_inexistent_node(outNodeNum);
         inNode = init_inexistent_node(inNodeNum);
         Edge *edge = new Edge(outNodeNum, inNodeNum);
@@ -37,6 +62,14 @@ int main(int argc, char *argv[])
         }
     }
 
+    for (auto &s: scc) {
+        for (auto &i : s) {
+            sccout << i << " ";
+        }
+        sccout << endl;
+    }
+
+    cout << "Combining scc..." << endl;
     combine_scc_node(scc);
 
     cout << "Building 2-hops-label's data structure..." << endl;
@@ -44,12 +77,30 @@ int main(int argc, char *argv[])
         if (beg->first == beg->second->data) {
             search_out_node(beg->second);
             search_in_node(beg->second);
+
+            labelout << graph.nameMap[beg->first] << endl;
+            for (auto i : beg->second->outNodes) {
+                labelout << graph.nameMap[i] << " ";
+            }
+            labelout << endl;
+
+            for (auto i : beg->second->inNodes) {
+                labelout << graph.nameMap[i] << " ";
+            }
+            labelout << endl;
         }
     }
 
+    clock_t finish = clock();
+
+    cout << "Total time: " << (finish-start)/CLOCKS_PER_SEC << " seconds" << endl;
+
     cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
-    while (cin >> outNodeNum >> inNodeNum) {
-        cout << query(outNodeNum,inNodeNum) << endl;
+    while (cin >> outNodeID >> inNodeID) {
+        outNodeNum = graph.numberMap[outNodeID];
+        inNodeNum = graph.numberMap[inNodeID];
+
+        cout << query(outNodeNum, inNodeNum) << endl;
         cout << "Please enter query data(e.g. from 1 to 2 => 1 2)" << endl;
     }
 
@@ -101,10 +152,14 @@ void tarjan(Node *node, map<int, int> &def, map<int, int> &low, stack<int> &st,
 
 void combine_scc_node(vector<vector<int>> &scc)
 {
-    for (auto s : scc) {
+    for (auto &s : scc) {
+        if (s.size() < 2) {
+            continue;
+        }
         int first = *(s.begin());
         map<int, bool> scc_sign;
-        for (auto i: s)
+        map<int, bool> accessed;
+        for (auto &i: s)
             scc_sign[i] = true;
 
         for (auto beg = s.begin(); beg != s.end(); ++beg) {
@@ -112,17 +167,23 @@ void combine_scc_node(vector<vector<int>> &scc)
                 continue;
             }
             int r = *beg;
-            for (Edge *edge = graph.nodes[r]->firOut; edge != nullptr; edge = edge->headLink) {
-                if (!scc_sign[edge->tailVex]) {
-                    edge->headVex = first;
-                    insert_edge(graph.nodes[first], edge);
+            for (Edge *edge = graph.nodes[r]->firOut; edge != nullptr;) {
+                auto temp = edge;
+                edge = edge->headLink;
+                if (!scc_sign[temp->tailVex] && !accessed[temp->tailVex]) {
+                    temp->headVex = first;
+                    insert_edge(graph.nodes[first], temp);
+                    accessed[temp->tailVex] = true;
                 }
             }
 
-            for (Edge *edge = graph.nodes[r]->firIn; edge != nullptr; edge = edge->tailLink) {
-                if (!scc_sign[edge->headVex]) {
-                    edge->tailVex = first;
-                    insert_reverse_edge(graph.nodes[first], edge);
+            for (Edge *edge = graph.nodes[r]->firIn; edge != nullptr;) {
+                auto temp = edge;
+                edge = edge->tailLink;
+                if (!scc_sign[temp->headVex] && !accessed[temp->headVex]) {
+                    temp->tailVex = first;
+                    insert_reverse_edge(graph.nodes[first], temp);
+                    accessed[temp->headVex] = true;
                 }
             }
             graph.nodes[r]->data = first;
@@ -200,11 +261,11 @@ bool query(int outNodeNum, int inNodeNum)
     Node *inNode = graph.nodes[ graph.nodes[inNodeNum]->data ];
 
     vector<int> out_vec(outNode->outNodes);
-    out_vec.push_back(outNodeNum);
+    out_vec.push_back(graph.nodes[outNodeNum]->data);
     sort(out_vec.begin(), out_vec.end());
 
     vector<int> in_vec(inNode->inNodes);
-    in_vec.push_back(inNodeNum);
+    in_vec.push_back(graph.nodes[inNodeNum]->data);
     sort(in_vec.begin(), in_vec.end());
 
     vector<int> result;
